@@ -1,0 +1,29 @@
+{
+  "name": "whatsapp-ai-dashboard",
+  "version": "1.0.0",
+  "description": "AI-powered WhatsApp dashboard with automated responses",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "ai",
+    "chatbot",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode": "^1.5.3",
+    "express": "^4.18.2",
+    "socket.io": "^4.6.1",
+    "openai": "^4.20.1",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5",
+    "googleapis": "^128.0.0",
+    "moment": "^2.30.1"
+  }
+}

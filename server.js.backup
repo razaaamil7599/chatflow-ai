@@ -1,0 +1,463 @@
+require('dotenv').config();
+const express = require('express');
+const http = require('http');
+const socketIO = require('socket.io');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const QRCode = require('qrcode');
+const OpenAI = require('openai');
+const path = require('path');
+const fs = require('fs');
+const cors = require('cors');
+const googleBackup = require('./google-backup');
+
+// Keep-Alive Configuration
+const KEEP_ALIVE_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 3000}`;
+const KEEP_ALIVE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+// Initialize Express
+const app = express();
+const server = http.createServer(app);
+const io = socketIO(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+// Configuration
+const PORT = process.env.PORT || 3000;
+const AI_MODEL = process.env.AI_MODEL || 'gpt-3.5-turbo';
+const AI_SYSTEM_PROMPT = process.env.AI_SYSTEM_PROMPT || 'You are a helpful AI assistant responding to WhatsApp messages. Be friendly, concise, and helpful.';
+const MIN_DELAY = parseInt(process.env.MIN_RESPONSE_DELAY) || 1000;
+const MAX_DELAY = parseInt(process.env.MAX_RESPONSE_DELAY) || 3000;
+
+// Initialize OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+// Store messages and state
+let messages = [];
+let contacts = new Map();
+let stats = {
+  messagesReceived: 0,
+  messagesSent: 0,
+  autoResponsesEnabled: process.env.AUTO_RESPONSE_ENABLED === 'true',
+  backupEnabled: false,
+  messagesBackedUp: 0,
+  mediaBackedUp: 0
+};
+let conversationHistory = new Map(); // Store conversation context per contact
+
+// Initialize WhatsApp Client
+const client = new Client({
+  authStrategy: new LocalAuth(),
+  puppeteer: {
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu'
+    ]
+  }
+});
+
+// WhatsApp Events
+client.on('qr', async (qr) => {
+  console.log('QR Code received, generating image...');
+  try {
+    const qrImage = await QRCode.toDataURL(qr);
+    io.emit('qr', qrImage);
+    console.log('QR Code sent to dashboard');
+  } catch (err) {
+    console.error('Error generating QR code:', err);
+  }
+});
+
+client.on('ready', () => {
+  console.log('WhatsApp client is ready!');
+  io.emit('ready', { message: 'WhatsApp connected successfully!' });
+});
+
+client.on('authenticated', () => {
+  console.log('WhatsApp authenticated');
+  io.emit('authenticated');
+});
+
+client.on('auth_failure', (msg) => {
+  console.error('Authentication failure:', msg);
+  io.emit('auth_failure', { error: msg });
+});
+
+client.on('disconnected', (reason) => {
+  console.log('WhatsApp disconnected:', reason);
+  io.emit('disconnected', { reason });
+});
+
+client.on('message', async (message) => {
+  try {
+    console.log('Message received:', message.body);
+
+    // Skip messages from groups and status updates
+    const chat = await message.getChat();
+    if (chat.isGroup) {
+      console.log('Skipping group message');
+      return;
+    }
+
+    // Get contact info with fallbacks
+    let contactInfo;
+    try {
+      const contact = await message.getContact();
+      contactInfo = {
+        id: contact.id._serialized,
+        name: contact.pushname || contact.name || contact.number || 'Unknown',
+        number: contact.number || contact.id.user,
+        profilePicUrl: null
+      };
+
+      // Try to get profile picture (may fail, so we catch it)
+      try {
+        contactInfo.profilePicUrl = await contact.getProfilePicUrl();
+      } catch (err) {
+        // Profile pic not available, use null
+        contactInfo.profilePicUrl = null;
+      }
+    } catch (err) {
+      console.error('Error getting contact info:', err);
+      // Fallback contact info
+      contactInfo = {
+        id: message.from || message.id._serialized,
+        name: message.from || 'Unknown Contact',
+        number: message.from || 'Unknown',
+        profilePicUrl: null
+      };
+    }
+
+    // Store contact
+    contacts.set(contactInfo.id, contactInfo);
+
+    // Create message object
+    const messageData = {
+      id: message.id._serialized,
+      from: contactInfo.name,
+      fromNumber: contactInfo.number,
+      contactId: contactInfo.id,
+      body: message.body,
+      timestamp: message.timestamp * 1000,
+      fromMe: message.fromMe,
+      hasMedia: message.hasMedia
+    };
+
+    // Store message
+    messages.unshift(messageData);
+
+    // Only increment if message is not from me
+    if (!message.fromMe) {
+      stats.messagesReceived++;
+    }
+
+    // Emit to dashboard
+    io.emit('message', messageData);
+    io.emit('stats', stats);
+    io.emit('contact', contactInfo);
+
+    console.log(`Message from ${contactInfo.name}: ${message.body}`);
+
+    // Backup to Google Sheets
+    if (googleBackup.enabled) {
+      const backed = await googleBackup.backupMessage(messageData);
+      if (backed) {
+        stats.messagesBackedUp++;
+        io.emit('backup_stats', googleBackup.getStats());
+      }
+    }
+
+    // Handle media if present
+    if (message.hasMedia && googleBackup.enabled) {
+      try {
+        const media = await message.downloadMedia();
+        const buffer = Buffer.from(media.data, 'base64');
+        const filename = media.filename || `media_${Date.now()}.${media.mimetype.split('/')[1]}`;
+        const mediaLink = await googleBackup.uploadMedia(buffer, filename, media.mimetype);
+
+        if (mediaLink) {
+          stats.mediaBackedUp++;
+          // Update message in sheet with media link
+          messageData.mediaLink = mediaLink;
+          messageData.mediaType = media.mimetype;
+          await googleBackup.backupMessage({ ...messageData, mediaLink, mediaType: media.mimetype });
+          io.emit('backup_stats', googleBackup.getStats());
+        }
+      } catch (err) {
+        console.error('Error downloading/uploading media:', err.message);
+      }
+    }
+
+    // Auto-respond if enabled and message is not from me
+    if (stats.autoResponsesEnabled && !message.fromMe) {
+      await handleAutoResponse(message, contactInfo);
+    }
+  } catch (error) {
+    console.error('Error handling message:', error);
+    io.emit('error', { message: 'Error processing message', error: error.message });
+  }
+});
+
+// AI Response Handler
+async function handleAutoResponse(message, contactInfo) {
+  try {
+    console.log(`Generating AI response for: ${contactInfo.name}`);
+
+    // Get or initialize conversation history
+    if (!conversationHistory.has(contactInfo.id)) {
+      conversationHistory.set(contactInfo.id, []);
+    }
+    const history = conversationHistory.get(contactInfo.id);
+
+    // Add user message to history
+    history.push({
+      role: 'user',
+      content: message.body
+    });
+
+    // Keep only last 10 messages for context
+    if (history.length > 20) {
+      history.splice(0, history.length - 20);
+    }
+
+    // Generate response using OpenAI
+    const completion = await openai.chat.completions.create({
+      model: AI_MODEL,
+      messages: [
+        { role: 'system', content: AI_SYSTEM_PROMPT },
+        ...history
+      ],
+      temperature: 0.7,
+      max_tokens: 500
+    });
+
+    const aiResponse = completion.choices[0].message.content;
+
+    // Add AI response to history
+    history.push({
+      role: 'assistant',
+      content: aiResponse
+    });
+
+    // Simulate typing delay
+    const delay = Math.random() * (MAX_DELAY - MIN_DELAY) + MIN_DELAY;
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    // Send response
+    await message.reply(aiResponse);
+
+    console.log(`AI Response sent to ${contactInfo.name}: ${aiResponse}`);
+
+    // Store sent message
+    const sentMessage = {
+      id: Date.now().toString(),
+      from: 'AI Assistant',
+      fromNumber: 'me',
+      contactId: contactInfo.id,
+      body: aiResponse,
+      timestamp: Date.now(),
+      fromMe: true,
+      isAI: true
+    };
+
+    messages.unshift(sentMessage);
+    stats.messagesSent++;
+
+    // Emit to dashboard
+    io.emit('message', sentMessage);
+    io.emit('stats', stats);
+
+    // Backup AI response to Google Sheets
+    if (googleBackup.enabled) {
+      await googleBackup.backupMessage(sentMessage);
+      stats.messagesBackedUp++;
+      io.emit('backup_stats', googleBackup.getStats());
+    }
+
+  } catch (error) {
+    console.error('Error generating AI response:', error);
+    io.emit('error', { message: 'Failed to generate AI response', error: error.message });
+  }
+}
+
+// Socket.IO Events
+io.on('connection', (socket) => {
+  console.log('Dashboard connected');
+
+  // Send current state
+  socket.emit('init', {
+    messages: messages.slice(0, 50),
+    contacts: Array.from(contacts.values()),
+    stats
+  });
+
+  // Toggle auto-response
+  socket.on('toggle_auto_response', (enabled) => {
+    stats.autoResponsesEnabled = enabled;
+    io.emit('stats', stats);
+    console.log('Auto-response:', enabled ? 'enabled' : 'disabled');
+  });
+
+  // Clear history
+  socket.on('clear_history', () => {
+    messages = [];
+    conversationHistory.clear();
+    io.emit('init', {
+      messages: [],
+      contacts: Array.from(contacts.values()),
+      stats
+    });
+    io.emit('history_cleared');
+    console.log('History cleared');
+  });
+
+  // Logout
+  socket.on('logout', async () => {
+    console.log('Logout requested from dashboard');
+    try {
+      await client.logout();
+      console.log('Client logged out');
+      // Re-initialize to get a new QR code
+      setTimeout(() => {
+        client.initialize();
+      }, 1000);
+    } catch (err) {
+      console.error('Error logging out:', err);
+      // Force destroy and re-init if logout fails
+      await client.destroy();
+      client.initialize();
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Dashboard disconnected');
+  });
+});
+
+// REST API Endpoints
+app.get('/api/messages', (req, res) => {
+  res.json({ messages: messages.slice(0, 100) });
+});
+
+app.get('/api/contacts', (req, res) => {
+  res.json({ contacts: Array.from(contacts.values()) });
+});
+
+app.get('/api/stats', (req, res) => {
+  res.json({ stats });
+});
+
+app.get('/api/backup/stats', (req, res) => {
+  res.json(googleBackup.getStats());
+});
+res.json({
+  openaiKey: process.env.OPENAI_API_KEY || '',
+  aiModel: process.env.AI_MODEL || 'gpt-3.5-turbo',
+  sheetId: process.env.GOOGLE_SHEET_ID || '',
+  driveId: process.env.GOOGLE_DRIVE_FOLDER_ID || '',
+  systemPrompt: process.env.AI_SYSTEM_PROMPT || ''
+});
+});
+
+// Update configuration
+app.post('/api/config', (req, res) => {
+  const { openaiKey, aiModel, sheetId, driveId, systemPrompt } = req.body;
+
+  try {
+    // Update in-memory variables
+    if (openaiKey) process.env.OPENAI_API_KEY = openaiKey;
+    if (aiModel) process.env.AI_MODEL = aiModel;
+    if (sheetId) process.env.GOOGLE_SHEET_ID = sheetId;
+    if (driveId) process.env.GOOGLE_DRIVE_FOLDER_ID = driveId;
+    if (systemPrompt) process.env.AI_SYSTEM_PROMPT = systemPrompt;
+
+    // Update OpenAI instance if key changed
+    if (openaiKey) {
+      openai.apiKey = openaiKey;
+    }
+
+    // Read existing .env file
+    let envContent = '';
+    const envPath = path.join(__dirname, '.env');
+    if (fs.existsSync(envPath)) {
+      envContent = fs.readFileSync(envPath, 'utf8');
+    }
+
+    // Helper to update or add key
+    const updateKey = (key, value) => {
+      const regex = new RegExp(`^${key}=.*`, 'm');
+      if (regex.test(envContent)) {
+        envContent = envContent.replace(regex, `${key}=${value}`);
+      } else {
+        envContent += `\n${key}=${value}`;
+      }
+    };
+
+    // Update keys in file content
+    if (openaiKey) updateKey('OPENAI_API_KEY', openaiKey);
+    if (aiModel) updateKey('AI_MODEL', aiModel);
+    if (sheetId) updateKey('GOOGLE_SHEET_ID', sheetId);
+    if (driveId) updateKey('GOOGLE_DRIVE_FOLDER_ID', driveId);
+    if (systemPrompt) updateKey('AI_SYSTEM_PROMPT', systemPrompt);
+
+    // Write back to .env
+    fs.writeFileSync(envPath, envContent);
+
+    console.log('✅ Configuration updated from dashboard');
+
+    // Re-initialize Google Backup if IDs changed
+    if (sheetId || driveId) {
+      googleBackup.initialize();
+    }
+
+    res.json({ success: true, message: 'Configuration saved successfully!' });
+  } catch (error) {
+    console.error('Error updating config:', error);
+    res.status(500).json({ success: false, error: 'Failed to save configuration' });
+  }
+});
+
+// Start server
+server.listen(PORT, () => {
+  console.log(`\n🚀 WhatsApp AI Dashboard Server Started`);
+  console.log(`📱 Dashboard: http://localhost:${PORT}`);
+  console.log(`🤖 AI Model: ${AI_MODEL}`);
+  console.log(`\nInitializing WhatsApp client...`);
+  console.log(`Please wait for QR code to appear in the dashboard.\n`);
+});
+
+// Initialize Google Backup
+googleBackup.initialize().then(enabled => {
+  stats.backupEnabled = enabled;
+  if (enabled) {
+    console.log('📊 Google Backup: Ready');
+    console.log(`   Sheet: ${googleBackup.getSheetUrl() || 'Not configured'}`);
+    console.log(`   Drive: ${googleBackup.getDriveFolderUrl() || 'Not configured'}`);
+  }
+}).catch(err => {
+  console.error('⚠️ Google Backup Initialization Error:', err.message);
+});
+
+// Initialize WhatsApp Client
+client.initialize();
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('\nShutting down gracefully...');
+  await client.destroy();
+  process.exit(0);
+});

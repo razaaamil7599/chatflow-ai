@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Cloud Setup - WhatsApp AI Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-hover: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(99, 102, 241, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .progress-bar {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .progress-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .progress-steps::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--border);
+            transform: translateY(-50%);
+            z-index: 0;
+        }
+
+        .progress-fill {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+            transform: translateY(-50%);
+            z-index: 1;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .step {
+            background: var(--bg-card);
+            border: 3px solid var(--border);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            z-index: 2;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .step.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+            transform: scale(1.1);
+        }
+
+        .step.completed {
+            background: var(--success);
+            border-color: var(--success);
+        }
+
+        .step.completed::after {
+            content: '✓';
+            color: white;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .card.hidden {
+            display: none;
+        }
+
+        .card h2 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card h3 {
+            color: var(--text);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.3rem;
+        }
+
+        .step-number {
+            background: var(--primary);
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .instruction {
+            background: var(--bg-dark);
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            border-left: 4px solid var(--primary);
+        }
+
+        .code-block {
+            background: #000;
+            color: #0f0;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 1rem 0;
+            overflow-x: auto;
+            border: 1px solid #333;
+        }
+
+        .code-block code {
+            font-size: 0.9rem;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: start;
+            gap: 0.75rem;
+        }
+
+        .alert-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 2px solid var(--success);
+            color: var(--success);
+        }
+
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border: 2px solid var(--warning);
+            color: var(--warning);
+        }
+
+        .alert-info {
+            background: rgba(99, 102, 241, 0.1);
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+            color: white;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+            margin-top: 1rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+        }
+
+        .input-group {
+            margin: 1.5rem 0;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .input-group input,
+        .input-group textarea {
+            width: 100%;
+            background: var(--bg-dark);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: var(--text);
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group input:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .input-group textarea {
+            min-height: 150px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .checklist {
+            list-style: none;
+            margin: 1rem 0;
+        }
+
+        .checklist li {
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: background 0.3s ease;
+        }
+
+        .checklist li:hover {
+            background: var(--bg-hover);
+        }
+
+        .checklist li::before {
+            content: '☐';
+            font-size: 1.5rem;
+            color: var(--text-muted);
+        }
+
+        .checklist li.checked::before {
+            content: '✓';
+            color: var(--success);
+        }
+
+        .link-external {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+
+        .link-external:hover {
+            color: #8b5cf6;
+            text-decoration: underline;
+        }
+
+        .link-external::after {
+            content: ' ↗';
+        }
+
+        .screenshot-placeholder {
+            background: var(--bg-dark);
+            border: 2px dashed var(--border);
+            border-radius: 10px;
+            padding: 3rem;
+            text-align: center;
+            color: var(--text-muted);
+            margin: 1rem 0;
+        }
+
+        .final-summary {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+            border: 2px solid var(--success);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-top: 2rem;
+        }
+
+        .final-summary h3 {
+            color: var(--success);
+            margin-top: 0;
+        }
+
+        .copy-btn {
+            background: var(--bg-dark);
+            color: var(--primary);
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            margin-left: 1rem;
+        }
+
+        .copy-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 2rem;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        .emoji {
+            font-size: 1.5rem;
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Google Cloud Setup Guide</h1>
+            <p>WhatsApp AI Dashboard - Complete Backup Integration</p>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-steps">
+                <div class="progress-fill" id="progressFill"></div>
+                <div class="step active" data-step="1">1</div>
+                <div class="step" data-step="2">2</div>
+                <div class="step" data-step="3">3</div>
+                <div class="step" data-step="4">4</div>
+                <div class="step" data-step="5">5</div>
+                <div class="step" data-step="6">6</div>
+                <div class="step" data-step="7">7</div>
+            </div>
+            <p style="text-align: center; color: var(--text-muted); margin-top: 1rem;">
+                Step <span id="currentStep">1</span> of 7 - Estimated time: <span id="timeEstimate">10-15 minutes</span>
+            </p>
+        </div>
+
+        <!-- Step 1: Google Cloud Project -->
+        <div class="card" data-step="1">
+            <h2><span class="step-number">1</span> Google Cloud Project बनाएं</h2>
+
+            <div class="alert alert-info">
+                <span class="alert-icon">💡</span>
+                <div>
+                    <strong>यह बिल्कुल FREE है!</strong><br>
+                    Google Cloud का free tier use करेंगे, कोई payment नहीं लगेगा।
+                </div>
+            </div>
+
+            <div class="instruction">
+                <h3>📝 Steps:</h3>
+                <ol style="margin-left: 1.5rem; margin-top: 1rem;">
+                    <li><strong>Google Cloud Console खोलें:</strong><br>
+                        <a href="https://console.cloud.google.com/" target="_blank"
+                            class="link-external">console.cloud.google.com</a>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>अपने Google account से Sign in करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Project Selector dropdown click करें</strong> (page के top पर)
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>"NEW PROJECT" button click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Project Details भरें:</strong>
+                        <div class="code-block">
+                            <code>Project name: WhatsApp AI Dashboard</code>
+                        </div>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>"CREATE" button click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>कुछ seconds wait करें</strong> (notification आएगा)</li>
+                    <li style="margin-top: 1rem;"><strong>Project selector में अपना नया project select करें</strong>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="alert alert-warning">
+                <span class="alert-icon">⚠️</span>
+                <div>
+                    <strong>Important:</strong> Project create होने के बाद, ensure करें कि वही project selected है (top
+                    bar में दिखेगा)
+                </div>
+            </div>
+
+            <div class="navigation">
+                <button class="btn" onclick="nextStep()" style="margin-left: auto;">अगला Step →</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Enable APIs -->
+        <div class="card hidden" data-step="2">
+            <h2><span class="step-number">2</span> APIs Enable करें</h2>
+
+            <div class="instruction">
+                <h3>🔌 Google Sheets API Enable करें:</h3>
+                <ol style="margin-left: 1.5rem; margin-top: 1rem;">
+                    <li><strong>☰ Menu → "APIs & Services" → "Library"</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Search bar में type करें:</strong>
+                        <div class="code-block"><code>Google Sheets API</code></div>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>Result पर click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>"ENABLE" button click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Wait करें जब तक "API enabled" message न आए</strong></li>
+                </ol>
+
+                <h3 style="margin-top: 2rem;">🔌 Google Drive API Enable करें:</h3>
+                <ol style="margin-left: 1.5rem; margin-top: 1rem;">
+                    <li><strong>"← " Back button click करें या फिर से Library में जाएं</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Search bar में type करें:</strong>
+                        <div class="code-block"><code>Google Drive API</code></div>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>Result पर click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>"ENABLE" button click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Wait करें confirmation के लिए</strong></li>
+                </ol>
+            </div>
+
+            <div class="alert alert-success">
+                <span class="alert-icon">✅</span>
+                <div>
+                    <strong>Done!</strong> दोनों APIs अब enabled हैं!
+                </div>
+            </div>
+
+            <div class="navigation">
+                <button class="btn" onclick="prevStep()">← पिछला</button>
+                <button class="btn" onclick="nextStep()">अगला Step →</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Service Account -->
+        <div class="card hidden" data-step="3">
+            <h2><span class="step-number">3</span> Service Account बनाएं</h2>
+
+            <div class="alert alert-info">
+                <span class="alert-icon">🤖</span>
+                <div>
+                    <strong>Service Account क्या है?</strong><br>
+                    यह एक special "robot" account है जो automatically आपके Google Sheet और Drive को access कर सकता है।
+                </div>
+            </div>
+
+            <div class="instruction">
+                <h3>📝 Steps:</h3>
+                <ol style="margin-left: 1.5rem; margin-top: 1rem;">
+                    <li><strong>☰ Menu → "APIs & Services" → "Credentials"</strong></li>
+                    <li style="margin-top: 1rem;"><strong>"+ CREATE CREDENTIALS" button click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>"Service account" option select करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Service account details भरें:</strong>
+                        <div class="code-block">
+                            <code>Service account name: whatsapp-dashboard-backup<br>
+Service account description: Backup service for WhatsApp messages</code>
+                        </div>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>"CREATE AND CONTINUE" click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Role select करें: "Editor"</strong>
+                        <div style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.9rem;">
+                            (Filter roles में "editor" type करें)
+                        </div>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>"CONTINUE" click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Step 3 को skip करें - "DONE" click करें</strong></li>
+                </ol>
+            </div>
+
+            <div class="navigation">
+                <button class="btn" onclick="prevStep()">← पिछला</button>
+                <button class="btn" onclick="nextStep()">अगला Step →</button>
+            </div>
+        </div>
+
+        <!-- Step 4: Download JSON Key -->
+        <div class="card hidden" data-step="4">
+            <h2><span class="step-number">4</span> JSON Key Download करें</h2>
+
+            <div class="alert alert-warning">
+                <span class="alert-icon">🔐</span>
+                <div>
+                    <strong>बहुत Important!</strong><br>
+                    यह file आपकी Google resources को access करती है। इसे किसी से share न करें!
+                </div>
+            </div>
+
+            <div class="instruction">
+                <h3>📝 Steps:</h3>
+                <ol style="margin-left: 1.5rem; margin-top: 1rem;">
+                    <li><strong>Credentials page पर, Service Accounts list में</strong><br>
+                        "whatsapp-dashboard-backup" के email पर click करें
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>"KEYS" tab पर जाएं</strong></li>
+                    <li style="margin-top: 1rem;"><strong>"ADD KEY" dropdown click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>"Create new key" select करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Key type: "JSON" select करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>"CREATE" button click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>File automatically download हो जाएगी</strong></li>
+                </ol>
+            </div>
+
+            <div class="input-group" style="margin-top: 2rem;">
+                <label>🔑 Downloaded JSON file का पूरा content यहाँ paste करें:</label>
+                <textarea id="jsonCredentials"
+                    placeholder='{"type": "service_account", "project_id": "...", ...}'></textarea>
+                <button class="btn btn-success" onclick="validateJSON()" style="width: 100%;">
+                    ✓ JSON Validate करें
+                </button>
+                <div id="jsonStatus" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="alert alert-info" style="margin-top: 1.5rem;">
+                <span class="alert-icon">📋</span>
+                <div>
+                    <strong>कैसे paste करें:</strong><br>
+                    1. Downloaded JSON file को Notepad में खोलें<br>
+                    2. सारा content copy करें (Ctrl+A, then Ctrl+C)<br>
+                    3. ऊपर के textbox में paste करें (Ctrl+V)
+                </div>
+            </div>
+
+            <div class="navigation">
+                <button class="btn" onclick="prevStep()">← पिछला</button>
+                <button class="btn" id="step4Next" onclick="nextStep()" disabled>अगला Step →</button>
+            </div>
+        </div>
+
+        <!-- Step 5: Google Sheet -->
+        <div class="card hidden" data-step="5">
+            <h2><span class="step-number">5</span> Google Sheet बनाएं</h2>
+
+            <div class="instruction">
+                <h3>📝 Steps:</h3>
+                <ol style="margin-left: 1.5rem; margin-top: 1rem;">
+                    <li><strong>Google Sheets खोलें:</strong><br>
+                        <a href="https://sheets.google.com/" target="_blank" class="link-external">sheets.google.com</a>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>"+ Blank" click करके नया spreadsheet बनाएं</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Sheet को name दें:</strong><br>
+                        "Untitled spreadsheet" पर click करें और type करें:
+                        <div class="code-block"><code>WhatsApp Messages Backup</code></div>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>"Share" button click करें (top-right corner)</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Service account email paste करें:</strong>
+                        <div class="code-block" id="serviceAccountEmail"
+                            style="background: var(--bg-dark); color: var(--primary);">
+                            <code>JSON file paste करने के बाद email यहाँ दिखेगा</code>
+                        </div>
+                        <button class="copy-btn" onclick="copyEmail()">📋 Copy Email</button>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>Permission: "Editor" select करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>⚠️ "Notify people" checkbox को UNCHECK करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>"Share" button click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Browser URL से Sheet ID copy करें:</strong>
+                        <div class="code-block" style="font-size: 0.8rem;">
+                            <code>https://docs.google.com/spreadsheets/d/<span style="color: #ff0;">YAHAN_SE_YEH_COPY_KAREIN</span>/edit</code>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="input-group" style="margin-top: 2rem;">
+                <label>📊 Google Sheet ID paste करें:</label>
+                <input type="text" id="sheetId" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms">
+                <button class="btn btn-success" onclick="validateSheetId()" style="width: 100%; margin-top: 0.5rem;">
+                    ✓ Sheet ID Validate करें
+                </button>
+                <div id="sheetStatus" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="navigation">
+                <button class="btn" onclick="prevStep()">← पिछला</button>
+                <button class="btn" id="step5Next" onclick="nextStep()" disabled>अगला Step →</button>
+            </div>
+        </div>
+
+        <!-- Step 6: Google Drive Folder -->
+        <div class="card hidden" data-step="6">
+            <h2><span class="step-number">6</span> Google Drive Folder बनाएं</h2>
+
+            <div class="instruction">
+                <h3>📝 Steps:</h3>
+                <ol style="margin-left: 1.5rem; margin-top: 1rem;">
+                    <li><strong>Google Drive खोलें:</strong><br>
+                        <a href="https://drive.google.com/" target="_blank" class="link-external">drive.google.com</a>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>"+ New" button click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>"Folder" select करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Folder name दें:</strong>
+                        <div class="code-block"><code>WhatsApp Media Backup</code></div>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>"CREATE" click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>नए folder पर right-click करें → "Share" select करें</strong>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>Service account email paste करें:</strong>
+                        <div class="code-block" id="serviceAccountEmail2"
+                            style="background: var(--bg-dark); color: var(--primary);">
+                            <code id="emailDisplay2">JSON file paste करने के बाद email यहाँ दिखेगा</code>
+                        </div>
+                        <button class="copy-btn" onclick="copyEmail()">📋 Copy Email</button>
+                    </li>
+                    <li style="margin-top: 1rem;"><strong>Permission: "Editor" select करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>⚠️ "Notify people" checkbox को UNCHECK करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>"Share" button click करें</strong></li>
+                    <li style="margin-top: 1rem;"><strong>Folder खोलें और URL से Folder ID copy करें:</strong>
+                        <div class="code-block" style="font-size: 0.8rem;">
+                            <code>https://drive.google.com/drive/folders/<span style="color: #ff0;">YAHAN_SE_YEH_COPY_KAREIN</span></code>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="input-group" style="margin-top: 2rem;">
+                <label>📁 Google Drive Folder ID paste करें:</label>
+                <input type="text" id="folderId" placeholder="1dyC0n7MQXjJI2hT-zJjT6jY2wNk4sH5e">
+                <button class="btn btn-success" onclick="validateFolderId()" style="width: 100%; margin-top: 0.5rem;">
+                    ✓ Folder ID Validate करें
+                </button>
+                <div id="folderStatus" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="navigation">
+                <button class="btn" onclick="prevStep()">← पिछला</button>
+                <button class="btn" id="step6Next" onclick="nextStep()" disabled>अगला Step →</button>
+            </div>
+        </div>
+
+        <!-- Step 7: Final Summary -->
+        <div class="card hidden" data-step="7">
+            <h2><span class="step-number">7</span> 🎉 Setup Complete!</h2>
+
+            <div class="alert alert-success">
+                <span class="alert-icon">✅</span>
+                <div>
+                    <strong>बधाई हो!</strong> आपका Google Cloud setup पूरा हो गया है!
+                </div>
+            </div>
+
+            <div class="final-summary">
+                <h3>📋 आपका Configuration:</h3>
+
+                <div class="input-group">
+                    <label>✅ Service Account Email:</label>
+                    <div class="code-block" id="finalEmail" style="background: var(--bg-dark);">
+                        <code>Loading...</code>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>✅ Google Sheet ID:</label>
+                    <div class="code-block" id="finalSheet" style="background: var(--bg-dark);">
+                        <code>Loading...</code>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>✅ Google Drive Folder ID:</label>
+                    <div class="code-block" id="finalFolder" style="background: var(--bg-dark);">
+                        <code>Loading...</code>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 2rem;">📄 Complete .env Configuration:</h3>
+                <div class="code-block" id="envConfig" style="background: #000;">
+                    <code>Generating...</code>
+                </div>
+                <button class="btn btn-success" onclick="copyEnvConfig()" style="width: 100%;">
+                    📋 Copy Complete .env Configuration
+                </button>
+            </div>
+
+            <div class="alert alert-info" style="margin-top: 2rem;">
+                <span class="alert-icon">💡</span>
+                <div>
+                    <strong>अगले Steps:</strong><br>
+                    1. मुझे बताएं कि setup complete हो गया<br>
+                    2. मैं automatically सारी files merge कर दूंगा<br>
+                    3. Server restart होगा<br>
+                    4. Backup feature ready हो जाएगा! 🚀
+                </div>
+            </div>
+
+            <div class="navigation">
+                <button class="btn" onclick="prevStep()">← पिछला</button>
+                <button class="btn btn-success" onclick="downloadConfig()"
+                    style="background: linear-gradient(135deg, var(--success) 0%, #059669 100%);">
+                    ✅ Setup Complete - Download Configuration
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let currentStepNum = 1;
+        let credentialsData = null;
+        let sheetIdData = null;
+        let folderIdData = null;
+
+        function updateProgress() {
+            const progress = ((currentStepNum - 1) / 6) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+            document.getElementById('currentStep').textContent = currentStepNum;
+
+            // Update step indicators
+            document.querySelectorAll('.step').forEach((step, index) => {
+                const stepNum = index + 1;
+                step.classList.remove('active', 'completed');
+                if (stepNum < currentStepNum) {
+                    step.classList.add('completed');
+                } else if (stepNum === currentStepNum) {
+                    step.classList.add('active');
+                }
+            });
+
+            // Update time estimate
+            const timeEstimates = {
+                1: '2-3 minutes',
+                2: '2 minutes',
+                3: '2 minutes',
+                4: '1 minute',
+                5: '2 minutes',
+                6: '2 minutes',
+                7: '1 minute'
+            };
+            document.getElementById('timeEstimate').textContent = timeEstimates[currentStepNum] || '1 minute';
+        }
+
+        function showStep(stepNum) {
+            document.querySelectorAll('.card').forEach(card => {
+                card.classList.add('hidden');
+            });
+            document.querySelector(`.card[data-step="${stepNum}"]`).classList.remove('hidden');
+            currentStepNum = stepNum;
+            updateProgress();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function nextStep() {
+            if (currentStepNum < 7) {
+                showStep(currentStepNum + 1);
+            }
+        }
+
+        function prevStep() {
+            if (currentStepNum > 1) {
+                showStep(currentStepNum - 1);
+            }
+        }
+
+        function validateJSON() {
+            const jsonText = document.getElementById('jsonCredentials').value.trim();
+            const statusDiv = document.getElementById('jsonStatus');
+
+            try {
+                credentialsData = JSON.parse(jsonText);
+
+                if (credentialsData.type === 'service_account' && credentialsData.client_email) {
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <span class="alert-icon">✅</span>
+                            <div>
+                                <strong>Valid JSON!</strong><br>
+                                Service Account Email: <code>${credentialsData.client_email}</code>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('step4Next').disabled = false;
+
+                    // Update email displays
+                    document.getElementById('serviceAccountEmail').innerHTML = `<code>${credentialsData.client_email}</code>`;
+                    document.getElementById('emailDisplay2').textContent = credentialsData.client_email;
+                } else {
+                    throw new Error('Invalid service account JSON');
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        <span class="alert-icon">⚠️</span>
+                        <div>
+                            <strong>Invalid JSON!</strong><br>
+                            Please copy the entire JSON file content correctly.
+                        </div>
+                    </div>
+                `;
+                document.getElementById('step4Next').disabled = true;
+            }
+        }
+
+        function validateSheetId() {
+            const sheetId = document.getElementById('sheetId').value.trim();
+            const statusDiv = document.getElementById('sheetStatus');
+
+            if (sheetId.length > 20 && !sheetId.includes('/') && !sheetId.includes(' ')) {
+                sheetIdData = sheetId;
+                statusDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <span class="alert-icon">✅</span>
+                        <div>
+                            <strong>Valid Sheet ID!</strong><br>
+                            Sheet URL: <a href="https://docs.google.com/spreadsheets/d/${sheetId}" target="_blank" class="link-external">Open Sheet</a>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('step5Next').disabled = false;
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        <span class="alert-icon">⚠️</span>
+                        <div>
+                            <strong>Invalid Sheet ID!</strong><br>
+                            Make sure to copy only the ID, not the entire URL.
+                        </div>
+                    </div>
+                `;
+                document.getElementById('step5Next').disabled = true;
+            }
+        }
+
+        function validateFolderId() {
+            const folderId = document.getElementById('folderId').value.trim();
+            const statusDiv = document.getElementById('folderStatus');
+
+            if (folderId.length > 10 && !folderId.includes('/') && !folderId.includes(' ')) {
+                folderIdData = folderId;
+                statusDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <span class="alert-icon">✅</span>
+                        <div>
+                            <strong>Valid Folder ID!</strong><br>
+                            Folder URL: <a href="https://drive.google.com/drive/folders/${folderId}" target="_blank" class="link-external">Open Folder</a>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('step6Next').disabled = false;
+                updateFinalSummary();
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        <span class="alert-icon">⚠️</span>
+                        <div>
+                            <strong>Invalid Folder ID!</strong><br>
+                            Make sure to copy only the ID, not the entire URL.
+                        </div>
+                    </div>
+                `;
+                document.getElementById('step6Next').disabled = true;
+            }
+        }
+
+        function updateFinalSummary() {
+            if (credentialsData) {
+                document.getElementById('finalEmail').innerHTML = `<code>${credentialsData.client_email}</code>`;
+            }
+            if (sheetIdData) {
+                document.getElementById('finalSheet').innerHTML = `<code>${sheetIdData}</code>`;
+            }
+            if (folderIdData) {
+                document.getElementById('finalFolder').innerHTML = `<code>${folderIdData}</code>`;
+            }
+
+            if (credentialsData && sheetIdData && folderIdData) {
+                const envConfig = `# Google Cloud Backup
+ENABLE_GOOGLE_BACKUP=true
+GOOGLE_APPLICATION_CREDENTIALS=./google-credentials.json
+GOOGLE_SHEET_ID=${sheetIdData}
+GOOGLE_DRIVE_FOLDER_ID=${folderIdData}`;
+
+                document.getElementById('envConfig').innerHTML = `<code>${envConfig.replace(/\n/g, '<br>')}</code>`;
+            }
+        }
+
+        function copyEmail() {
+            if (credentialsData && credentialsData.client_email) {
+                navigator.clipboard.writeText(credentialsData.client_email);
+                alert('✅ Email copied to clipboard!');
+            }
+        }
+
+        function copyEnvConfig() {
+            const envConfig = `# Google Cloud Backup
+ENABLE_GOOGLE_BACKUP=true
+GOOGLE_APPLICATION_CREDENTIALS=./google-credentials.json
+GOOGLE_SHEET_ID=${sheetIdData}
+GOOGLE_DRIVE_FOLDER_ID=${folderIdData}`;
+
+            navigator.clipboard.writeText(envConfig);
+            alert('✅ Configuration copied to clipboard!');
+        }
+
+        function downloadConfig() {
+            const config = {
+                credentials: credentialsData,
+                sheetId: sheetIdData,
+                folderId: folderIdData
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(config, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "google-cloud-config.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+
+            alert('✅ Configuration downloaded!\n\nअब मुझे chat में बताएं कि setup complete है, मैं automatically सब merge कर दूंगा!');
+        }
+
+        // Initialize
+        updateProgress();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp AI Dashboard</title>
+    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <path
+                            d="M16 2C8.268 2 2 8.268 2 16C2 18.76 2.88 21.32 4.36 23.44L2.2 29.8L8.84 27.68C10.88 28.96 13.36 29.72 16 29.72C23.732 29.72 30 23.452 30 15.72C30 7.988 23.732 2 16 2ZM16 27.2C13.68 27.2 11.48 26.52 9.6 25.28L9.16 25.04L5.44 26.04L6.48 22.44L6.2 21.96C4.84 19.96 4.08 17.6 4.08 15.16C4.08 9.48 8.72 4.84 14.4 4.84C17.12 4.84 19.68 5.88 21.6 7.76C23.52 9.64 24.56 12.2 24.56 14.92C24.56 20.6 19.92 25.24 14.24 25.24L16 27.2Z"
+                            fill="url(#gradient1)" />
+                        <defs>
+                            <linearGradient id="gradient1" x1="2" y1="2" x2="30" y2="30">
+                                <stop offset="0%" stop-color="#6366f1" />
+                                <stop offset="100%" stop-color="#8b5cf6" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1>WhatsApp AI</h1>
+            </div>
+
+            <div class="stats-section">
+                <h3>Statistics</h3>
+                <div class="stat-card">
+                    <div class="stat-icon received">📥</div>
+                    <div class="stat-info">
+                        <div class="stat-label">Received</div>
+                        <div class="stat-value" id="receivedCount">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon sent">📤</div>
+                    <div class="stat-info">
+                        <div class="stat-label">Sent</div>
+                        <div class="stat-value" id="sentCount">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h3>Controls</h3>
+                <div class="toggle-container">
+                    <label class="toggle-label">
+                        <span>Auto-Response</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="autoResponseToggle" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                </div>
+                <button class="clear-history-btn" id="clearHistoryBtn">
+                    <span>🗑️</span> Clear History
+                </button>
+            </div>
+
+            <div class="status-section">
+                <h3>Connection Status</h3>
+                <div class="status-indicator" id="connectionStatus">
+                    <div class="status-dot connecting"></div>
+                    <span>Connecting...</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <h2>Dashboard</h2>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="settingsBtn">
+                        ⚙️ Settings
+                    </button>
+                </div>
+            </header>
+
+            <!-- QR Code Section (shown when not connected) -->
+            <div class="qr-section" id="qrSection">
+                <div class="qr-card">
+                    <h2>Scan QR Code</h2>
+                    <p>Open WhatsApp on your phone and scan this QR code to connect</p>
+                    <div class="qr-code-container" id="qrCodeContainer">
+                        <div class="qr-loader">
+                            <div class="spinner"></div>
+                            <p>Generating QR Code...</p>
+                        </div>
+                    </div>
+                    <div class="qr-instructions">
+                        <div class="instruction">
+                            <span class="instruction-number">1</span>
+                            <span>Open WhatsApp on your phone</span>
+                        </div>
+                        <div class="instruction">
+                            <span class="instruction-number">2</span>
+                            <span>Tap Menu or Settings and select Linked Devices</span>
+                        </div>
+                        <div class="instruction">
+                            <span class="instruction-number">3</span>
+                            <span>Tap on Link a Device and scan this QR code</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages Section (shown when connected) -->
+            <div class="messages-section" id="messagesSection" style="display: none;">
+                <div class="contacts-panel">
+                    <div class="panel-header">
+                        <h3>Conversations</h3>
+                        <input type="text" class="search-input" placeholder="Search contacts..." id="searchInput">
+                    </div>
+                    <div class="contacts-list" id="contactsList">
+                        <div class="no-contacts">
+                            <p>No conversations yet</p>
+                            <span>Messages will appear here</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-panel">
+                    <div class="chat-header" id="chatHeader">
+                        <div class="chat-placeholder">
+                            <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                                <circle cx="40" cy="40" r="40" fill="url(#gradient2)" opacity="0.1" />
+                                <path
+                                    d="M40 20C30.06 20 22 28.06 22 38C22 41.4 23.1 44.62 25 47.3L22.8 54.8L30.7 52.7C33.3 54.4 36.5 55.4 40 55.4C49.94 55.4 58 47.34 58 37.4C58 27.46 49.94 20 40 20Z"
+                                    fill="url(#gradient2)" />
+                                <defs>
+                                    <linearGradient id="gradient2" x1="22" y1="20" x2="58" y2="55.4">
+                                        <stop offset="0%" stop-color="#6366f1" />
+                                        <stop offset="100%" stop-color="#8b5cf6" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                            <h3>Select a conversation</h3>
+                            <p>Choose a contact to view messages and AI responses</p>
+                        </div>
+                    </div>
+                    <div class="chat-messages" id="chatMessages">
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Dashboard Settings</h2>
+                <span class="close" id="closeSettings">&times;</span>
+            </div>
+
+            <div class="modal-tabs">
+                <button class="tab-btn active" onclick="switchTab('ai-settings')">🤖 AI Configuration</button>
+                <button class="tab-btn" onclick="switchTab('api-keys')">🔑 API Keys & Backup</button>
+            </div>
+
+            <div class="modal-body-scroll">
+                <div id="ai-settings" class="tab-content active">
+                    <div class="form-group">
+                        <label for="aiModel">AI Model Selection</label>
+                        <select id="aiModel" class="form-control">
+                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Fast & Cheap)</option>
+                            <option value="gpt-4">GPT-4 (Smarter & More Expensive)</option>
+                            <option value="gpt-4-turbo">GPT-4 Turbo (Best Performance)</option>
+                        </select>
+                        <small>Select which AI model handles your responses.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="systemPrompt">System Prompt (AI Personality)</label>
+                        <textarea id="systemPrompt" rows="6" placeholder="You are a helpful assistant..."></textarea>
+                        <small>Define how the AI should behave, what tone to use, and what rules to follow.</small>
+                    </div>
+                </div>
+
+                <div id="api-keys" class="tab-content">
+                    <div class="form-group">
+                        <label for="openaiKey">OpenAI API Key</label>
+                        <div class="input-with-icon">
+                            <input type="password" id="openaiKey" placeholder="sk-..." class="form-control">
+                            <button class="toggle-visibility" onclick="toggleVisibility('openaiKey')">👁️</button>
+                        </div>
+                        <small>Required for AI responses.</small>
+                    </div>
+
+                    <div class="divider"></div>
+                    <h3>📊 Google Cloud Backup</h3>
+
+                    <div class="form-group">
+                        <label for="sheetId">Google Sheet ID</label>
+                        <input type="text" id="sheetId" placeholder="1sUsSx..." class="form-control">
+                        <small>ID from your Google Sheet URL.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="driveId">Google Drive Folder ID</label>
+                        <input type="text" id="driveId" placeholder="1gKML..." class="form-control">
+                        <small>ID from your Google Drive Folder URL.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button id="logoutBtn" class="btn btn-secondary"
+                    style="color: var(--danger); border-color: var(--danger);">🚪 Logout / Reset</button>
+                <button id="saveSettings" class="btn btn-primary">💾 Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
