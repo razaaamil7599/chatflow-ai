@@ -23,9 +23,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Settings Elements
     const settingsBtn = document.getElementById('settingsBtn');
     const settingsModal = document.getElementById('settingsModal');
-    const closeSettings = document.getElementById('closeSettings'); // Changed from class selector
+    const closeSettings = document.getElementById('closeSettings');
     const saveSettingsBtn = document.getElementById('saveSettings');
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    const resetSessionBtn = document.getElementById('resetSessionBtn');
     const toast = document.getElementById('toast');
 
     // Socket Events
@@ -71,6 +72,17 @@ document.addEventListener('DOMContentLoaded', () => {
         allContacts = data.contacts || [];
         updateStats(data.stats);
         renderContacts();
+
+        // Update settings modal with current config
+        if (data.config) {
+            updateSettingsUI(data.config);
+        }
+    });
+
+    socket.on('config_updated', (config) => {
+        console.log('Config updated:', config);
+        updateSettingsUI(config);
+        showToast('⚙️ Session settings updated!');
     });
 
     socket.on('message', (message) => {
@@ -112,22 +124,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settingsBtn) {
         settingsBtn.addEventListener('click', async () => {
             settingsModal.style.display = 'block';
-
-            // Fetch current config
+            // Fetch latest config to be sure
             try {
                 const response = await fetch('/api/config');
                 const config = await response.json();
-
-                if (document.getElementById('aiModel')) document.getElementById('aiModel').value = config.aiModel;
-                if (document.getElementById('systemPrompt')) document.getElementById('systemPrompt').value = config.systemPrompt;
-                if (document.getElementById('openaiKey')) document.getElementById('openaiKey').value = config.openaiKey;
-                if (document.getElementById('sheetId')) document.getElementById('sheetId').value = config.sheetId;
-                if (document.getElementById('driveId')) document.getElementById('driveId').value = config.driveId;
-            } catch (error) {
-                console.error('Error fetching config:', error);
-                showToast('Failed to load settings', 'error');
+                updateSettingsUI(config);
+            } catch (err) {
+                console.error('Error fetching config:', err);
             }
         });
+    }
+
+    function updateSettingsUI(config) {
+        if (document.getElementById('aiModel')) document.getElementById('aiModel').value = config.aiModel || 'gpt-3.5-turbo';
+        if (document.getElementById('systemPrompt')) document.getElementById('systemPrompt').value = config.systemPrompt || '';
+        if (document.getElementById('backupToggle')) document.getElementById('backupToggle').checked = config.backupEnabled;
     }
 
     if (closeSettings) {
@@ -142,46 +153,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    const logoutBtn = document.getElementById('logoutBtn');
-
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            if (confirm('Are you sure you want to logout? This will disconnect WhatsApp and you will need to scan QR code again.')) {
+    // Reset Session Button
+    if (resetSessionBtn) {
+        resetSessionBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to RESET the session? This will disconnect the current user.')) {
                 socket.emit('logout');
-                settingsModal.style.display = 'none';
             }
         });
     }
 
     if (saveSettingsBtn) {
-        saveSettingsBtn.addEventListener('click', async () => {
+        saveSettingsBtn.addEventListener('click', () => {
             const config = {
                 aiModel: document.getElementById('aiModel').value,
                 systemPrompt: document.getElementById('systemPrompt').value,
-                openaiKey: document.getElementById('openaiKey').value,
-                sheetId: document.getElementById('sheetId').value,
-                driveId: document.getElementById('driveId').value
+                backupEnabled: document.getElementById('backupToggle').checked
             };
 
-            try {
-                const response = await fetch('/api/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    showToast('Settings saved successfully! Server updated.', 'success');
-                    settingsModal.style.display = 'none';
-                } else {
-                    showToast('Failed to save settings', 'error');
-                }
-            } catch (error) {
-                console.error('Error saving config:', error);
-                showToast('Error saving settings', 'error');
-            }
+            // Emit update via socket
+            socket.emit('update_session_config', config);
+            settingsModal.style.display = 'none';
         });
     }
 
@@ -207,8 +198,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-
-
     // Helper Functions
     function updateStatus(status, text) {
         if (!connectionStatus) return;
@@ -221,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateStats(stats) {
         if (receivedCount) receivedCount.textContent = stats.messagesReceived || 0;
         if (sentCount) sentCount.textContent = stats.messagesSent || 0;
-        if (autoResponseToggle) autoResponseToggle.checked = stats.autoResponsesEnabled;
+        if (autoResponseToggle) autoResponseToggle.checked = stats.autoResponseEnabled;
     }
 
     function renderContacts(filter = '') {
