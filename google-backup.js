@@ -25,16 +25,24 @@ class GoogleBackupService {
                 return false;
             }
 
-            const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-            const absolutePath = path.resolve(process.cwd(), credentialsPath);
-            console.log(`📊 Loading credentials from: ${absolutePath}`);
+            let credentials;
 
-            if (!fs.existsSync(absolutePath)) {
-                console.log('⚠️  Google Backup: Credentials file not found');
-                return false;
+            // Check if we have credentials in environment variable (Best for Render/Railway)
+            if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+                console.log('📊 Loading credentials from environment variable');
+                credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+            } else {
+                // Fallback to file system (Local development)
+                const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || './google-credentials.json';
+                const absolutePath = path.resolve(process.cwd(), credentialsPath);
+                console.log(`📊 Loading credentials from file: ${absolutePath}`);
+
+                if (!fs.existsSync(absolutePath)) {
+                    console.log('⚠️  Google Backup: Credentials file not found');
+                    return false;
+                }
+                credentials = JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
             }
-
-            const credentials = JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
 
             this.auth = new google.auth.GoogleAuth({
                 credentials,
