@@ -1,6 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize Socket.IO
-    const socket = io();
+    // Initialize Socket.IO with enhanced reconnection
+    const socket = io({
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 10,
+        timeout: 20000
+    });
 
     // State
     let currentContact = null;
@@ -28,6 +35,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
     const resetSessionBtn = document.getElementById('resetSessionBtn');
     const toast = document.getElementById('toast');
+
+    // Connection Events
+    socket.on('connect', () => {
+        console.log('✅ Socket connected:', socket.id);
+        console.log('🔌 Transport:', socket.io.engine.transport.name);
+        updateStatus('connecting', 'Connected to server');
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('❌ Socket disconnected:', reason);
+        updateStatus('connecting', 'Reconnecting...');
+        showToast('⚠️ Connection lost, reconnecting...', 'warning');
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('🔴 Connection error:', error.message);
+        updateStatus('disconnected', 'Connection Error');
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+        console.log('🔄 Reconnected after', attemptNumber, 'attempts');
+        showToast('✅ Reconnected to server');
+    });
+
+    socket.on('reconnect_attempt', (attemptNumber) => {
+        console.log('🔄 Reconnection attempt:', attemptNumber);
+        updateStatus('connecting', `Reconnecting (${attemptNumber})...`);
+    });
+
+    socket.on('reconnect_failed', () => {
+        console.error('❌ Reconnection failed');
+        updateStatus('disconnected', 'Connection Failed');
+        showToast('❌ Cannot connect to server. Please refresh.', 'error');
+    });
 
     // Socket Events
     socket.on('qr', (qrImage) => {
@@ -72,6 +113,11 @@ document.addEventListener('DOMContentLoaded', () => {
         allContacts = data.contacts || [];
         updateStats(data.stats);
         renderContacts();
+
+        // Update auto-response toggle to match server state
+        if (autoResponseToggle && data.stats) {
+            autoResponseToggle.checked = data.stats.autoResponsesEnabled || false;
+        }
 
         // Update settings modal with current config
         if (data.config) {

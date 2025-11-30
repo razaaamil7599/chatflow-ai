@@ -77,11 +77,9 @@ class GoogleBackupService {
 
             this.currentSheetId = sheetId;
 
-            // Ensure Messages sheet exists with extended columns
+            // Ensure Messages sheet exists with correct columns
             await this.ensureSheet('Messages', [
-                'Timestamp', 'Contact Name', 'Contact Number', 'Message Type',
-                'Message Body', 'Message ID', 'Has Media', 'Media Type', 'Media Link', 'AI Model',
-                'Client Name', 'Destination', 'Experience', 'Return Applicant'
+                'Timestamp', 'Phone', 'Message', 'Direction', 'Name', 'Category'
             ]);
 
             console.log('📊 Google Backup: Ready');
@@ -128,7 +126,7 @@ class GoogleBackupService {
             // Check and add headers
             const response = await this.sheets.spreadsheets.values.get({
                 spreadsheetId: this.currentSheetId,
-                range: `${sheetName}!A1:J1`
+                range: `${sheetName}!A1:F1`
             });
 
             if (!response.data.values || response.data.values.length === 0) {
@@ -180,37 +178,29 @@ class GoogleBackupService {
         return sheet ? sheet.properties.sheetId : 0;
     }
 
-    async backupMessage(messageData) {
+    async backupMessage(messageData, contactInfo = {}) {
         if (!this.enabled || !this.currentSheetId) return false;
 
         try {
             const timestamp = moment(messageData.timestamp).format('YYYY-MM-DD HH:mm:ss');
-            const messageType = messageData.fromMe ?
-                (messageData.isAI ? 'AI Response' : 'Outgoing') : 'Incoming';
+            const direction = messageData.fromMe ? 'OUTBOUND' : 'INBOUND';
 
-            // Extract client information from message
-            const clientInfo = this.extractClientInfo(messageData.body || '');
+            // Use provided contact info or fallback to message data
+            const name = contactInfo.name || messageData.from || '';
+            const category = contactInfo.category || '';
 
             const row = [
                 timestamp,
-                messageData.from,
-                messageData.fromNumber,
-                messageType,
-                messageData.body,
-                messageData.id,
-                messageData.hasMedia ? 'TRUE' : 'FALSE',
-                messageData.mediaType || '',
-                messageData.mediaLink || '',
-                messageData.isAI && process.env.AI_MODEL ? process.env.AI_MODEL : '',
-                clientInfo.name || '',
-                clientInfo.destination || '',
-                clientInfo.experience || '',
-                clientInfo.returnApplicant || ''
+                messageData.fromNumber || messageData.from, // Phone
+                messageData.body,                           // Message
+                direction,                                  // Direction
+                name,                                       // Name
+                category                                    // Category
             ];
 
             await this.sheets.spreadsheets.values.append({
                 spreadsheetId: this.currentSheetId,
-                range: 'Messages!A:N',
+                range: 'Messages!A:F',
                 valueInputOption: 'RAW',
                 resource: { values: [row] }
             });

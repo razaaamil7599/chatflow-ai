@@ -21,8 +21,13 @@ const server = http.createServer(app);
 const io = socketIO(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  connectTimeout: 45000
 });
 
 app.use(cors());
@@ -42,8 +47,51 @@ const openai = new OpenAI({
 });
 
 // Store messages and state
+const DATA_FILE = path.join(__dirname, 'chats.json');
 let messages = [];
 let contacts = new Map();
+let conversationHistory = new Map(); // Store conversation context per contact
+
+// Load data from file
+function loadData() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+      messages = data.messages || [];
+
+      // Reconstruct Map from array
+      if (data.contacts) {
+        contacts = new Map(data.contacts);
+      }
+
+      if (data.conversationHistory) {
+        conversationHistory = new Map(data.conversationHistory);
+      }
+
+      console.log(`✅ Loaded ${messages.length} messages and ${contacts.size} contacts from storage`);
+    }
+  } catch (err) {
+    console.error('Error loading data:', err);
+  }
+}
+
+// Save data to file
+function saveData() {
+  try {
+    const data = {
+      messages: messages.slice(0, 1000), // Keep last 1000 messages
+      contacts: Array.from(contacts.entries()),
+      conversationHistory: Array.from(conversationHistory.entries())
+    };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error('Error saving data:', err);
+  }
+}
+
+// Load initial data
+loadData();
+
 let stats = {
   messagesReceived: 0,
   messagesSent: 0,
@@ -52,7 +100,6 @@ let stats = {
   messagesBackedUp: 0,
   mediaBackedUp: 0
 };
-let conversationHistory = new Map(); // Store conversation context per contact
 
 // Initialize WhatsApp Client
 const client = new Client({
@@ -84,8 +131,11 @@ client.on('qr', async (qr) => {
 });
 
 client.on('ready', () => {
-  console.log('WhatsApp client is ready!');
+  console.log('✅ WhatsApp client is ready!');
   io.emit('ready', { message: 'WhatsApp connected successfully!' });
+
+  // Mark that WhatsApp is ready for reconnecting dashboards
+  global.whatsappReady = true;
 });
 
 client.on('authenticated', () => {
@@ -145,6 +195,7 @@ client.on('message', async (message) => {
 
     // Store contact
     contacts.set(contactInfo.id, contactInfo);
+    saveData(); // Save new contact
 
     // Create message object
     const messageData = {
@@ -160,6 +211,7 @@ client.on('message', async (message) => {
 
     // Store message
     messages.unshift(messageData);
+    saveData(); // Save new message
 
     // Only increment if message is not from me
     if (!message.fromMe) {
@@ -175,7 +227,7 @@ client.on('message', async (message) => {
 
     // Backup to Google Sheets
     if (googleBackup.enabled) {
-      const backed = await googleBackup.backupMessage(messageData);
+      const backed = await googleBackup.backupMessage(messageData, contactInfo);
       if (backed) {
         stats.messagesBackedUp++;
         io.emit('backup_stats', googleBackup.getStats());
@@ -195,7 +247,7 @@ client.on('message', async (message) => {
           // Update message in sheet with media link
           messageData.mediaLink = mediaLink;
           messageData.mediaType = media.mimetype;
-          await googleBackup.backupMessage({ ...messageData, mediaLink, mediaType: media.mimetype });
+          await googleBackup.backupMessage({ ...messageData, mediaLink, mediaType: media.mimetype }, contactInfo);
           io.emit('backup_stats', googleBackup.getStats());
         }
       } catch (err) {
@@ -212,6 +264,44 @@ client.on('message', async (message) => {
     io.emit('error', { message: 'Error processing message', error: error.message });
   }
 });
+
+// Extract Contact Info using AI
+async function extractContactInfo(messageBody, currentInfo) {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: "You are a data extraction assistant. Extract the user's Name and Category from the message. Category options: 'Job Seeker', 'Hiring', 'Inquiry', 'Other'. Return JSON only: {\"name\": \"...\", \"category\": \"...\"}. If not found, return null for that field."
+        },
+        {
+          role: "user",
+          content: messageBody
+        }
+      ],
+      temperature: 0,
+      max_tokens: 100
+    });
+
+    const result = JSON.parse(completion.choices[0].message.content);
+
+    // Only update if new info found
+    const updates = {};
+    if (result.name && (!currentInfo.name || currentInfo.name === 'Unknown' || currentInfo.name === currentInfo.number)) {
+      updates.name = result.name;
+    }
+    if (result.category) {
+      updates.category = result.category;
+    }
+
+    return updates;
+
+  } catch (error) {
+    console.error('Error extracting info:', error);
+    return {};
+  }
+}
 
 // AI Response Handler
 async function handleAutoResponse(message, contactInfo) {
@@ -234,6 +324,17 @@ async function handleAutoResponse(message, contactInfo) {
     if (history.length > 20) {
       history.splice(0, history.length - 20);
     }
+    saveData(); // Save history update
+
+    // Extract info in parallel
+    extractContactInfo(message.body, contactInfo).then(updates => {
+      if (Object.keys(updates).length > 0) {
+        Object.assign(contactInfo, updates);
+        contacts.set(contactInfo.id, contactInfo);
+        io.emit('contact', contactInfo);
+        console.log('Updated contact info:', updates);
+      }
+    });
 
     // Generate response using OpenAI
     const completion = await openai.chat.completions.create({
@@ -277,6 +378,7 @@ async function handleAutoResponse(message, contactInfo) {
 
     messages.unshift(sentMessage);
     stats.messagesSent++;
+    saveData(); // Save sent message
 
     // Emit to dashboard
     io.emit('message', sentMessage);
@@ -284,7 +386,7 @@ async function handleAutoResponse(message, contactInfo) {
 
     // Backup AI response to Google Sheets
     if (googleBackup.enabled) {
-      await googleBackup.backupMessage(sentMessage);
+      await googleBackup.backupMessage(sentMessage, contactInfo);
       stats.messagesBackedUp++;
       io.emit('backup_stats', googleBackup.getStats());
     }
@@ -297,7 +399,12 @@ async function handleAutoResponse(message, contactInfo) {
 
 // Socket.IO Events
 io.on('connection', (socket) => {
-  console.log('Dashboard connected');
+  console.log('📱 Dashboard connected:', socket.id, 'Transport:', socket.conn.transport.name);
+
+  // Log transport upgrades
+  socket.conn.on('upgrade', (transport) => {
+    console.log('⬆️ Transport upgraded to:', transport.name);
+  });
 
   // Send current state
   socket.emit('init', {
@@ -305,6 +412,14 @@ io.on('connection', (socket) => {
     contacts: Array.from(contacts.values()),
     stats
   });
+
+  // Send WhatsApp ready status if already connected
+  if (global.whatsappReady) {
+    console.log('📤 Sending ready status to reconnected dashboard');
+    setTimeout(() => {
+      socket.emit('ready', { message: 'WhatsApp connected successfully!' });
+    }, 100);
+  }
 
   // Toggle auto-response
   socket.on('toggle_auto_response', (enabled) => {
@@ -317,6 +432,7 @@ io.on('connection', (socket) => {
   socket.on('clear_history', () => {
     messages = [];
     conversationHistory.clear();
+    saveData(); // Save cleared state
     io.emit('init', {
       messages: [],
       contacts: Array.from(contacts.values()),
