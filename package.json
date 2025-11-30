@@ -16,7 +16,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "whatsapp-web.js": "^1.23.0",
+    "whatsapp-web.js": "latest",
     "qrcode": "^1.5.3",
     "express": "^4.18.2",
     "socket.io": "^4.6.1",

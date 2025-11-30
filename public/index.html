@@ -65,10 +65,6 @@
                 <button class="clear-history-btn" id="clearHistoryBtn">
                     <span>🗑️</span> Clear History
                 </button>
-                <button class="clear-history-btn" id="resetSessionBtn"
-                    style="margin-top: 10px; background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);">
-                    <span>🔄</span> Reset Session
-                </button>
             </div>
 
             <div class="status-section">
@@ -81,133 +77,69 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="main-content">
-            <!-- Header -->
-            <header class="header">
-                <h2>Dashboard</h2>
-                <div class="header-actions">
-                    <button class="btn btn-secondary" id="settingsBtn">
-                        ⚙️ Demo Settings
-                    </button>
-                </div>
-            </header>
-
-            <!-- QR Code Section (shown when not connected) -->
-            <div class="qr-section" id="qrSection">
-                <div class="qr-card">
-                    <h2>Scan QR Code</h2>
-                    <p>Open WhatsApp on your phone and scan this QR code to connect</p>
-                    <div class="qr-code-container" id="qrCodeContainer">
-                        <div class="qr-loader">
-                            <div class="spinner"></div>
-                            <p>Generating QR Code...</p>
-                        </div>
-                    </div>
-                    <div class="qr-instructions">
-                        <div class="instruction">
-                            <span class="instruction-number">1</span>
-                            <span>Open WhatsApp on your phone</span>
-                        </div>
-                        <div class="instruction">
-                            <span class="instruction-number">2</span>
-                            <span>Tap Menu or Settings and select Linked Devices</span>
-                        </div>
-                        <div class="instruction">
-                            <span class="instruction-number">3</span>
-                            <span>Tap on Link a Device and scan this QR code</span>
-                        </div>
+        <main class="main-content" id="qrSection">
+            <div class="qr-section">
+                <h2>Scan QR Code</h2>
+                <p>Open WhatsApp on your phone and scan this QR code to connect</p>
+                <div class="qr-code-container" id="qrCodeContainer">
+                    <div class="qr-loader">
+                        <div class="spinner"></div>
+                        <p>Generating QR Code...</p>
                     </div>
                 </div>
-            </div>
-
-            <!-- Messages Section (shown when connected) -->
-            <div class="messages-section" id="messagesSection" style="display: none;">
-                <div class="contacts-panel">
-                    <div class="panel-header">
-                        <h3>Conversations</h3>
-                        <input type="text" class="search-input" placeholder="Search contacts..." id="searchInput">
+                <div class="qr-instructions">
+                    <div class="instruction">
+                        <span class="instruction-number">1</span>
+                        <span>Open WhatsApp on your phone</span>
                     </div>
-                    <div class="contacts-list" id="contactsList">
-                        <div class="no-contacts">
-                            <p>No conversations yet</p>
-                            <span>Messages will appear here</span>
-                        </div>
+                    <div class="instruction">
+                        <span class="instruction-number">2</span>
+                        <span>Tap Menu or Settings and select Linked Devices</span>
                     </div>
-                </div>
-
-                <div class="chat-panel">
-                    <div class="chat-header" id="chatHeader">
-                        <div class="chat-placeholder">
-                            <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                                <circle cx="40" cy="40" r="40" fill="url(#gradient2)" opacity="0.1" />
-                                <path
-                                    d="M40 20C30.06 20 22 28.06 22 38C22 41.4 23.1 44.62 25 47.3L22.8 54.8L30.7 52.7C33.3 54.4 36.5 55.4 40 55.4C49.94 55.4 58 47.34 58 37.4C58 27.46 49.94 20 40 20Z"
-                                    fill="url(#gradient2)" />
-                                <defs>
-                                    <linearGradient id="gradient2" x1="22" y1="20" x2="58" y2="55.4">
-                                        <stop offset="0%" stop-color="#6366f1" />
-                                        <stop offset="100%" stop-color="#8b5cf6" />
-                                    </linearGradient>
-                                </defs>
-                            </svg>
-                            <h3>Select a conversation</h3>
-                            <p>Choose a contact to view messages and AI responses</p>
-                        </div>
-                    </div>
-                    <div class="chat-messages" id="chatMessages">
+                    <div class="instruction">
+                        <span class="instruction-number">3</span>
+                        <span>Tap on Link a Device and scan this QR code</span>
                     </div>
                 </div>
             </div>
         </main>
-    </div>
 
-    <!-- Settings Modal -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>⚙️ Demo Configuration</h2>
-                <span class="close" id="closeSettings">&times;</span>
-            </div>
-
-            <div class="modal-tabs">
-                <button class="tab-btn active" onclick="switchTab('ai-settings')">🤖 AI Persona</button>
-                <button class="tab-btn" onclick="switchTab('api-keys')">🔧 Advanced</button>
-            </div>
-
-            <div class="modal-body-scroll">
-                <div id="ai-settings" class="tab-content active">
-                    <div class="form-group">
-                        <label for="systemPrompt">System Prompt (AI Personality)</label>
-                        <textarea id="systemPrompt" rows="6" placeholder="You are a helpful assistant..."></textarea>
-                        <small>Define how the AI should behave. Try: 'You are a rude waiter' or 'You are a
-                            poet'.</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="toggle-label" style="justify-content: space-between; display: flex;">
-                            <span>Enable Google Backup</span>
-                            <div class="toggle-switch">
-                                <input type="checkbox" id="backupToggle">
-                                <span class="toggle-slider"></span>
-                            </div>
-                        </label>
-                        <small>Turn this OFF if you don't want to save chats to the Google Sheet.</small>
-                    </div>
+        <!-- Messages Section (shown when connected) -->
+        <div class="messages-section" id="messagesSection" style="display: none;">
+            <div class="contacts-panel">
+                <div class="panel-header">
+                    <h3>Conversations</h3>
+                    <input type="text" class="search-input" placeholder="Search contacts..." id="searchInput">
                 </div>
-
-                <div id="api-keys" class="tab-content">
-                    <div class="form-group">
-                        <label for="aiModel">AI Model</label>
-                        <select id="aiModel" class="form-control">
-                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Fast)</option>
-                            <option value="gpt-4">GPT-4 (Smart)</option>
-                        </select>
+                <div class="contacts-list" id="contactsList">
+                    <div class="no-contacts">
+                        <p>No conversations yet</p>
+                        <span>Messages will appear here</span>
                     </div>
                 </div>
             </div>
 
-            <div class="modal-footer">
-                <button id="saveSettings" class="btn btn-primary">Apply Settings</button>
+            <div class="chat-panel">
+                <div class="chat-header" id="chatHeader">
+                    <div class="chat-placeholder">
+                        <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                            <circle cx="40" cy="40" r="40" fill="url(#gradient2)" opacity="0.1" />
+                            <path
+                                d="M40 20C30.06 20 22 28.06 22 38C22 41.4 23.1 44.62 25 47.3L22.8 54.8L30.7 52.7C33.3 54.4 36.5 55.4 40 55.4C49.94 55.4 58 47.34 58 37.4C58 27.46 49.94 20 40 20Z"
+                                fill="url(#gradient2)" />
+                            <defs>
+                                <linearGradient id="gradient2" x1="22" y1="20" x2="58" y2="55.4">
+                                    <stop offset="0%" stop-color="#6366f1" />
+                                    <stop offset="100%" stop-color="#8b5cf6" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <h3>Select a conversation</h3>
+                        <p>Choose a contact to view messages and AI responses</p>
+                    </div>
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                </div>
             </div>
         </div>
     </div>

@@ -15,3 +15,5 @@ yarn-error.log*
 .idea/
 google-backup.js.backup
 test-*.js
+chats.json
+server.js.backup

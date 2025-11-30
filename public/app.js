@@ -27,14 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatHeader = document.getElementById('chatHeader');
     const searchInput = document.getElementById('searchInput');
 
-    // Settings Elements
-    const settingsBtn = document.getElementById('settingsBtn');
-    const settingsModal = document.getElementById('settingsModal');
-    const closeSettings = document.getElementById('closeSettings');
-    const saveSettingsBtn = document.getElementById('saveSettings');
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
-    const resetSessionBtn = document.getElementById('resetSessionBtn');
     const toast = document.getElementById('toast');
+
+
 
     // Connection Events
     socket.on('connect', () => {
@@ -125,11 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    socket.on('config_updated', (config) => {
-        console.log('Config updated:', config);
-        updateSettingsUI(config);
-        showToast('⚙️ Session settings updated!');
-    });
+
 
     socket.on('message', (message) => {
         console.log('New message:', message);
@@ -165,62 +157,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Error:', data);
         showToast(`❌ ${data.message}`, 'error');
     });
-
-    // Settings Modal Logic
-    if (settingsBtn) {
-        settingsBtn.addEventListener('click', async () => {
-            settingsModal.style.display = 'block';
-            // Fetch latest config to be sure
-            try {
-                const response = await fetch('/api/config');
-                const config = await response.json();
-                updateSettingsUI(config);
-            } catch (err) {
-                console.error('Error fetching config:', err);
-            }
-        });
-    }
-
-    function updateSettingsUI(config) {
-        if (document.getElementById('aiModel')) document.getElementById('aiModel').value = config.aiModel || 'gpt-3.5-turbo';
-        if (document.getElementById('systemPrompt')) document.getElementById('systemPrompt').value = config.systemPrompt || '';
-        if (document.getElementById('backupToggle')) document.getElementById('backupToggle').checked = config.backupEnabled;
-    }
-
-    if (closeSettings) {
-        closeSettings.addEventListener('click', () => {
-            settingsModal.style.display = 'none';
-        });
-    }
-
-    window.addEventListener('click', (e) => {
-        if (e.target === settingsModal) {
-            settingsModal.style.display = 'none';
-        }
-    });
-
-    // Reset Session Button
-    if (resetSessionBtn) {
-        resetSessionBtn.addEventListener('click', () => {
-            if (confirm('Are you sure you want to RESET the session? This will disconnect the current user.')) {
-                socket.emit('logout');
-            }
-        });
-    }
-
-    if (saveSettingsBtn) {
-        saveSettingsBtn.addEventListener('click', () => {
-            const config = {
-                aiModel: document.getElementById('aiModel').value,
-                systemPrompt: document.getElementById('systemPrompt').value,
-                backupEnabled: document.getElementById('backupToggle').checked
-            };
-
-            // Emit update via socket
-            socket.emit('update_session_config', config);
-            settingsModal.style.display = 'none';
-        });
-    }
 
     // Other Event Listeners
     if (autoResponseToggle) {
@@ -383,22 +319,4 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStatus('connecting', 'Connecting...');
 });
 
-// Global Functions attached to window for inline onclick handlers
-window.switchTab = (tabId) => {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    // Find the button that called this function
-    const buttons = document.querySelectorAll('.tab-btn');
-    buttons.forEach(btn => {
-        if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabId)) {
-            btn.classList.add('active');
-        }
-    });
 
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-};
-
-window.toggleVisibility = (inputId) => {
-    const input = document.getElementById(inputId);
-    input.type = input.type === 'password' ? 'text' : 'password';
-};

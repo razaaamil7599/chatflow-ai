@@ -119,10 +119,14 @@ const client = new Client({
 });
 
 // WhatsApp Events
+// Store last QR code
+let lastQR = null;
+
 client.on('qr', async (qr) => {
   console.log('QR Code received, generating image...');
   try {
     const qrImage = await QRCode.toDataURL(qr);
+    lastQR = qrImage; // Save for new connections
     io.emit('qr', qrImage);
     console.log('QR Code sent to dashboard');
   } catch (err) {
@@ -136,6 +140,7 @@ client.on('ready', () => {
 
   // Mark that WhatsApp is ready for reconnecting dashboards
   global.whatsappReady = true;
+  lastQR = null; // Clear QR code
 });
 
 client.on('authenticated', () => {
@@ -413,6 +418,11 @@ io.on('connection', (socket) => {
     stats
   });
 
+  // Send last QR if available and not ready
+  if (!global.whatsappReady && lastQR) {
+    socket.emit('qr', lastQR);
+  }
+
   // Send WhatsApp ready status if already connected
   if (global.whatsappReady) {
     console.log('📤 Sending ready status to reconnected dashboard');
@@ -442,20 +452,39 @@ io.on('connection', (socket) => {
     console.log('History cleared');
   });
 
-  // Logout
-  socket.on('logout', async () => {
-    console.log('Logout requested from dashboard');
+  // Hard Reset
+  socket.on('hard_reset', async () => {
+    console.log('Hard reset requested from dashboard');
     try {
-      await client.logout();
-      console.log('Client logged out');
-      // Re-initialize to get a new QR code
-      setTimeout(() => {
-        client.initialize();
-      }, 1000);
-    } catch (err) {
-      console.error('Error logging out:', err);
-      // Force destroy and re-init if logout fails
       await client.destroy();
+
+      // Delete session directories
+      const authPath = path.join(__dirname, '.wwebjs_auth');
+      const cachePath = path.join(__dirname, '.wwebjs_cache');
+
+      if (fs.existsSync(authPath)) {
+        fs.rmSync(authPath, { recursive: true, force: true });
+        console.log('Deleted .wwebjs_auth');
+      }
+      if (fs.existsSync(cachePath)) {
+        fs.rmSync(cachePath, { recursive: true, force: true });
+        console.log('Deleted .wwebjs_cache');
+      }
+
+      console.log('Session files cleared. Re-initializing...');
+      io.emit('init', {
+        messages: [],
+        contacts: [],
+        stats
+      });
+
+      // Re-initialize
+      client.initialize();
+
+    } catch (err) {
+      console.error('Error during hard reset:', err);
+      io.emit('error', { message: 'Hard reset failed', error: err.message });
+      // Try to re-init anyway
       client.initialize();
     }
   });
@@ -482,17 +511,6 @@ app.get('/api/backup/stats', (req, res) => {
   res.json(googleBackup.getStats());
 });
 
-// Get current configuration
-app.get('/api/config', (req, res) => {
-  res.json({
-    openaiKey: process.env.OPENAI_API_KEY || '',
-    aiModel: process.env.AI_MODEL || 'gpt-3.5-turbo',
-    sheetId: process.env.GOOGLE_SHEET_ID || '',
-    driveId: process.env.GOOGLE_DRIVE_FOLDER_ID || '',
-    systemPrompt: process.env.AI_SYSTEM_PROMPT || ''
-  });
-});
-
 // Keep-Alive endpoints
 app.get('/ping', (req, res) => {
   res.send('pong');
@@ -506,63 +524,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Update configuration
-app.post('/api/config', (req, res) => {
-  const { openaiKey, aiModel, sheetId, driveId, systemPrompt } = req.body;
-
-  try {
-    // Update in-memory variables
-    if (openaiKey) process.env.OPENAI_API_KEY = openaiKey;
-    if (aiModel) process.env.AI_MODEL = aiModel;
-    if (sheetId) process.env.GOOGLE_SHEET_ID = sheetId;
-    if (driveId) process.env.GOOGLE_DRIVE_FOLDER_ID = driveId;
-    if (systemPrompt) process.env.AI_SYSTEM_PROMPT = systemPrompt;
-
-    // Update OpenAI instance if key changed
-    if (openaiKey) {
-      openai.apiKey = openaiKey;
-    }
-
-    // Read existing .env file
-    let envContent = '';
-    const envPath = path.join(__dirname, '.env');
-    if (fs.existsSync(envPath)) {
-      envContent = fs.readFileSync(envPath, 'utf8');
-    }
-
-    // Helper to update or add key
-    const updateKey = (key, value) => {
-      const regex = new RegExp(`^${key}=.*`, 'm');
-      if (regex.test(envContent)) {
-        envContent = envContent.replace(regex, `${key}=${value}`);
-      } else {
-        envContent += `\n${key}=${value}`;
-      }
-    };
-
-    // Update keys in file content
-    if (openaiKey) updateKey('OPENAI_API_KEY', openaiKey);
-    if (aiModel) updateKey('AI_MODEL', aiModel);
-    if (sheetId) updateKey('GOOGLE_SHEET_ID', sheetId);
-    if (driveId) updateKey('GOOGLE_DRIVE_FOLDER_ID', driveId);
-    if (systemPrompt) updateKey('AI_SYSTEM_PROMPT', systemPrompt);
-
-    // Write back to .env
-    fs.writeFileSync(envPath, envContent);
-
-    console.log('✅ Configuration updated from dashboard');
-
-    // Re-initialize Google Backup if IDs changed
-    if (sheetId || driveId) {
-      googleBackup.initialize();
-    }
-
-    res.json({ success: true, message: 'Configuration saved successfully!' });
-  } catch (error) {
-    console.error('Error updating config:', error);
-    res.status(500).json({ success: false, error: 'Failed to save configuration' });
-  }
-});
 
 // Start server
 server.listen(PORT, () => {
