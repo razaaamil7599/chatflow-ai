@@ -106,8 +106,11 @@ const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
     headless: true,
-    // Render.com uses Chromium in a specific path
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    // --- FIX FOR RENDER DEPLOYMENT (ENOENT Error) ---
+    // Explicitly set the path to chromium, which is usually at /usr/bin/chromium 
+    // after running the apt-get install command in Render's Build Command.
+    // This overrides the path that was failing.
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
